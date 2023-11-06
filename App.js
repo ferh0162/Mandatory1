@@ -10,7 +10,7 @@ const ball = {
     x: width / 2 - 25,
     y: height / 2 - 25,
   },
-  size: 50,
+  size: 40,
   velocity: {
     x: 0.4,
     y: 0.4,
@@ -63,9 +63,18 @@ const update = (entities, { time }) => {
   const ballEntity = entities.ball;
   const paddleEntity = entities.paddle;
 
+
+  
     //ball constantly moves
   ballEntity.position.x += ballEntity.velocity.x * time.delta;
   ballEntity.position.y += ballEntity.velocity.y * time.delta;
+
+    // Increase ball speed every 2 seconds
+    if (!entities.ball.lastSpeedIncrease || time.current - entities.ball.lastSpeedIncrease >= 2000) {
+      entities.ball.velocity.x *= 1.1; // Increase speed by 10%
+      entities.ball.velocity.y *= 1.1; // Increase speed by 10%
+      entities.ball.lastSpeedIncrease = time.current; // Update last speed increase time
+    }
 
   // Ball collision with walls
   if (
@@ -87,6 +96,7 @@ const update = (entities, { time }) => {
   ) {
     ballEntity.velocity.y *= -1;
   }
+
 
 
  // Check if the ball has fallen below the screen and no alert is shown
@@ -129,6 +139,17 @@ const movePaddle = (entities, { touches }) => {
     return entities;
   };
 
+  const timerSystem = (entities, { time }) => {
+    const { setTimer } = entities;
+    if (!entities.alertShown) {
+      setTimer(prevTime => prevTime + time.delta / 1000); // increment timer
+    }
+  
+  
+    return entities;
+  };
+  
+
   const resetGame = (entities) => {
     // Reset ball position and velocity
     entities.ball.position.x = width / 2 - 25;
@@ -139,6 +160,9 @@ const movePaddle = (entities, { touches }) => {
     // Reset paddle position
     entities.paddle.position.x = width / 2 - 50;
     entities.paddle.position.y = height - 50;
+
+     // Reset timer
+  entities.setTimer(0);
   
     return entities;
   };
@@ -146,6 +170,11 @@ const movePaddle = (entities, { touches }) => {
   export default function App() {
     const [gameStarted, setGameStarted] = useState(false);
     const [alertShown, setAlertShown] = useState(false);
+    const [timer, setTimer] = useState(0); // New timer state
+    const [highScore, setHighScore] = useState(0);
+    if (timer > highScore) {
+      setHighScore(timer);
+    }
   
     if (!gameStarted) {
       return (
@@ -159,17 +188,23 @@ const movePaddle = (entities, { touches }) => {
     }
   
     return (
+      <View style={{ flex: 1 }}>
+      <Text style={styles.timerText}>Timer: {timer.toFixed(1)}</Text>
+      <Text style={styles.highScoreText}>Highscore: {highScore.toFixed(1)}</Text>
       <GameEngine
-        systems={[update, movePaddle]}
-        entities={{
-          ball: { ...ball, renderer: ball.renderer },
-          paddle: { ...paddle, renderer: paddle.renderer },
-          alertShown: alertShown,
-          setAlertShown: setAlertShown,
-          resetRequested: false,
-        }}
+      systems={[update, movePaddle, timerSystem]} // Add the timer system
+      entities={{
+        ball: { ...ball, renderer: ball.renderer },
+        paddle: { ...paddle, renderer: paddle.renderer },
+        alertShown: alertShown,
+        setAlertShown: setAlertShown,
+        resetRequested: false,
+        setTimer: setTimer // Pass the setTimer function
+      }}
         style={{ flex: 1, backgroundColor: 'black' }}
       />
+        </View>
+
     );
   }
   
@@ -194,6 +229,22 @@ const movePaddle = (entities, { touches }) => {
     playButtonText: {
       color: 'black',
       fontSize: 18,
+    },
+    timerText: {
+      color: 'white',
+      fontSize: 20,
+      position: 'absolute',
+      top: 40,
+      alignSelf: 'center',
+      zIndex: 1,
+    },
+    highScoreText: {
+      color: 'white',
+      fontSize: 20,
+      position: 'absolute',
+      top: 80,
+      alignSelf: 'center',
+      zIndex: 1,
     },
   });
   
