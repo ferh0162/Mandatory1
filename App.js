@@ -1,134 +1,204 @@
-import React,{useState, useEffect} from 'react';
-import { Dimensions, View, Button, StyleSheet } from 'react-native';
-import { GameEngine } from 'react-native-game-engine';
+import React, { useState } from "react"; // Import useState
+import { Dimensions, View, Alert } from "react-native";
+import { Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { GameEngine } from "react-native-game-engine";
 
+const { width, height } = Dimensions.get("window");
 
-export default function App() {
-  const { width, height } = Dimensions.get('window')
-  const [items, setItems] = useState({
-    1:createBall( 10, 20)
-  })
-  const ball2 = createBall( 100, 200)
+const ball = {
+  position: {
+    x: width / 2 - 25,
+    y: height / 2 - 25,
+  },
+  size: 50,
+  velocity: {
+    x: 0.4,
+    y: 0.4,
+  },
+  renderer: (props) => {
+    const { position, size } = props;
+    return (
+      <View
+        style={{
+          backgroundColor: "white",
+          position: "absolute",
+          left: position.x,
+          top: position.y,
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+        }}
+      />
+    );
+  },
+};
 
-  useEffect(() => {
-    console.log("useEffect, entities :", items);
-  }, [items]);
-
-  console.log("window size: ", width, height)
-  
-  function createBall( x, y){
-    return {
-      position: {
-        x: width/2 - 25,
-        y: height/2 - 25,
-      },
-      size: 50,
-      velocity: {
-        x: 0.1,
-        y: 0.1,
-      },
-      renderer: function(props) { // Now using a regular function syntax
-        const { position, size } = props;
-        return (
-          <View
-            style={{
-              backgroundColor: 'red',
-              position: 'absolute',
-              left: position.x,
-              top: position.y,
-              width: size,
-              height: size,
-              borderRadius: size / 2,
-            }}
-          ></View>
-        );
-      },
-    }
-  }
-
-  const addBall = () => {
-    // Create the new ball entity
-    const newBallId = Object.keys(items).length + 1;
-    console.log("addBall() newKey: ", newBallId)
-    const newBall = createBall( Math.random() * width, Math.random() * height)
-    console.log(newBall)
-    // Update the state to include the new ball
-    setItems({
-      ...items, 
-      [newBallId]:newBall,
-    }); // cann't call print on entities, because it's async
-  };
+const paddle = {
+  position: {
+    x: width / 2 - 50,
+    y: height - 50,
+  },
+  size: {
+    width: 100,
+    height: 20,
+  },
+  renderer: (props) => {
+    const { position, size } = props;
+    return (
+      <View
+        style={{
+          backgroundColor: "white",
+          position: "absolute",
+          left: position.x,
+          top: position.y,
+          width: size.width,
+          height: size.height,
+        }}
+      />
+    );
+  },
+};
 
 const update = (entities, { time }) => {
-      //console.log("Entities ", entities)
-      const ballEntity = entities.ball2;
-    
-      ballEntity.position.x += ballEntity.velocity.x * time.delta;
-      ballEntity.position.y += ballEntity.velocity.y * time.delta;
-    
-      if (ballEntity.position.x + ballEntity.size > width || ballEntity.position.x < 0) {
-        ballEntity.velocity.x *= -1;
+  const ballEntity = entities.ball;
+  const paddleEntity = entities.paddle;
+
+    //ball constantly moves
+  ballEntity.position.x += ballEntity.velocity.x * time.delta;
+  ballEntity.position.y += ballEntity.velocity.y * time.delta;
+
+  // Ball collision with walls
+  if (
+    ballEntity.position.x + ballEntity.size > width ||
+    ballEntity.position.x < 0
+  ) {
+    ballEntity.velocity.x *= -1;
+  }
+
+  if (ballEntity.position.y < 0) {
+    ballEntity.velocity.y *= -1;
+  }
+
+  // Ball collision with paddle
+  if (
+    ballEntity.position.y + ballEntity.size > paddleEntity.position.y &&
+    ballEntity.position.x + ballEntity.size > paddleEntity.position.x &&
+    ballEntity.position.x < paddleEntity.position.x + paddleEntity.size.width
+  ) {
+    ballEntity.velocity.y *= -1;
+  }
+
+
+ // Check if the ball has fallen below the screen and no alert is shown
+ if (ballEntity.position.y > height && !entities.alertShown) {
+  entities.alertShown = true; // Set the flag to prevent new alerts
+
+  // Trigger an alert
+  Alert.alert("Game Over", "You lost", [
+    {
+      text: "Retry",
+      onPress: () => {
+        entities.resetRequested = true; // Set a flag to request a reset
       }
-    
-      if (ballEntity.position.y + ballEntity.size > height || ballEntity.position.y < 0) {
-        ballEntity.velocity.y *= -1;
-      }
+    }
+  ]);
+
+  // Stop the ball
+  ballEntity.velocity.x = 0;
+  ballEntity.velocity.y = 0;
+}
+
+// Check if a reset is requested
+if (entities.resetRequested) {
+  resetGame(entities);
+  entities.alertShown = false; // Reset the alertShown flag
+  entities.resetRequested = false; // Reset the resetRequested flag
+}
+
+  return entities;
+};
+
+const movePaddle = (entities, { touches }) => {
+  touches.filter(t => t.type === 'move').forEach(t => {
+    let paddleEntity = entities.paddle;
+    if (paddleEntity && paddleEntity.position) {
+      paddleEntity.position.x = t.event.pageX - paddleEntity.size.width / 2;
+    }
+  });
+
+    return entities;
+  };
+
+  const resetGame = (entities) => {
+    // Reset ball position and velocity
+    entities.ball.position.x = width / 2 - 25;
+    entities.ball.position.y = height / 2 - 25;
+    entities.ball.velocity.x = 0.4;
+    entities.ball.velocity.y = 0.4;
+  
+    // Reset paddle position
+    entities.paddle.position.x = width / 2 - 50;
+    entities.paddle.position.y = height - 50;
   
     return entities;
   };
-  
-  // const update = (entities, { time }) => {
-  //   // Delta time since last update
-  //   const delta = time.delta;
-  
-  //   // Iterate over all entities and update those that are balls
-  //  //console.log("in update: ",entities)
 
-  //   Object.keys(entities).forEach(key => {
-  //    // console.log("inside update time:" , time, "key: ", key)
-  //     if (entities[key].renderer) {
-  //       // Assuming that entities with a renderer are balls
-  //       const ball = entities[key];
+  export default function App() {
+    const [gameStarted, setGameStarted] = useState(false);
+    const [alertShown, setAlertShown] = useState(false);
   
-  //       // Update the position based on velocity and delta time
-  //       ball.position.x += ball.velocity.x * delta;
-  //       ball.position.y += ball.velocity.y * delta;
+    if (!gameStarted) {
+      return (
+        <View style={styles.container}>
+          <Text style={styles.title}>Welcome to the Game!</Text>
+          <TouchableOpacity style={styles.playButton} onPress={() => setGameStarted(true)}>
+            <Text style={styles.playButtonText}>Play</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
   
-  //       // Implement collision detection with boundaries if necessary
-  //       // For example, if the ball hits the edge of the screen, it could bounce
-  //       // This is just a placeholder for your logic
-  //       if (ball.position.x + ball.size > width || ball.position.x < 0) {
-  //         console.log("change direction ", ball.position.x)
-  //         ball.velocity.x *= -1; // Reverse direction on X axis
-  //       }
-  //       if (ball.position.y > height - ball.size || ball.position.y < 0) {
-  //         ball.velocity.y = -ball.velocity.y; // Reverse direction on Y axis
-  //       }
-  //     }
-  //   });
-  
-  //   return entities;
-  // };
-console.log("before return ", items)
-  return (
-    <View style={styles.container}>
+    return (
       <GameEngine
-        key={Object.keys(items).length} // Change key to force re-render on items change
-        entities={{ball2}}
-        systems={[update]}
-        style={{ flex: 1, backgroundColor: 'white' }}
+        systems={[update, movePaddle]}
+        entities={{
+          ball: { ...ball, renderer: ball.renderer },
+          paddle: { ...paddle, renderer: paddle.renderer },
+          alertShown: alertShown,
+          setAlertShown: setAlertShown,
+          resetRequested: false,
+        }}
+        style={{ flex: 1, backgroundColor: 'black' }}
       />
-      <Button title="Add Ball" onPress={addBall} />
-    </View>
-  );
-}
-
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+    );
+  }
+  
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: 'black',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    title: {
+      fontSize: 24,
+      color: 'white',
+      marginBottom: 20,
+    },
+    playButton: {
+      backgroundColor: 'white',
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      borderRadius: 5,
+    },
+    playButtonText: {
+      color: 'black',
+      fontSize: 18,
+    },
+  });
+  
+  
+  
+  
+  
+  
